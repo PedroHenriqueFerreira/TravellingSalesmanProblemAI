@@ -2,12 +2,16 @@ from typing import Optional
 from random import sample
 
 class TSP:
-    def __init__(self, d_file: str, s_file: Optional[str] = None):        
+    ''' Classe que representa o problema do Caixeiro Viajante '''
+    
+    def __init__(self, d_file: str, s_file: Optional[str] = None, xy_file: Optional[str] = None):       
         self.d_file = d_file # Arquivo que possui a matriz de distâncias
         self.s_file = s_file # Arquivo que possui todos os passos da solução ótima
+        self.xy_file = xy_file # Arquivo que possui as coordenadas dos pontos
         
         self.d: list[list[float]] = [] # Matriz de distâncias
-        self.s: Optional[list[int]] = None # Passos da solução ótima
+        self.s: Optional[TSPState] = None # Passos da solução ótima
+        self.xy: Optional[list[Coord]] = None # Coordenadas dos pontos
         
         self.load()
         
@@ -23,26 +27,48 @@ class TSP:
             if len(row) > 0:
                 self.d.append(row)
             
-        if self.s_file is None:
-            return
-        
-        self.s = []
-        
-        with open(self.s_file) as f:
-            s_data = f.readlines()
-            
-        for line in s_data:
-            row = [int(value) for value in line.split() if value]
-            
-            if len(row) > 0:
-                self.s.extend(row)
+        if self.s_file is not None:
+            with open(self.s_file) as f:
+                s_data = f.readlines()
+                
+            s = []
+                
+            for line in s_data:
+                for value in line.split():
+                    if not value:
+                        continue
+                    
+                    value = int(value)
+                    
+                    if value in s:
+                        continue
+                    
+                    s.append(value)
 
+            self.s = TSPState(self, s)
+        
+        if self.xy_file is not None:
+            with open(self.xy_file) as f:
+                xy_data = f.readlines()
+                
+            self.xy = []
+            
+            for line in xy_data:
+                xy = [float(value) for value in line.split() if value]
+                
+                if len(xy) != 2:
+                    continue
+                
+                self.xy.append(Coord(*xy))
+                
     def random_state(self) -> 'TSPState':
         ''' Gera um estado aleatório '''
         
         return TSPState(self, sample(range(1, len(self.d) + 1), len(self.d)))
 
 class TSPState:
+    ''' Classe que representa um estado do problema do Caixeiro Viajante '''
+    
     def __init__(self, tsp: TSP, value: list[int]):
         self.tsp = tsp # Instância do problema
         self.value = value # Estado atual
@@ -108,3 +134,8 @@ class TSPState:
         value[i:j + 1] = reversed(value[i:j + 1])
         
         return TSPState(self.tsp, value)
+
+class Coord:
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y

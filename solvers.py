@@ -1,4 +1,3 @@
-from typing import Optional
 from random import choices, choice, random, randint
 from math import exp
 from time import time
@@ -6,19 +5,21 @@ from time import time
 from tsp import TSP, TSPState
 
 class Solver:
-    def __init__(self):
+    ''' Classe base para todos os solvers '''
+    
+    def __init__(self, tsp: TSP, verbose=False):
+        self.tsp = tsp # Problema a ser resolvido
+        self.verbose = verbose # Modo verboso
+        
         self.timer = 0 # Tempo de execução
         
-        self.steps = 0 # Número de passos
-        self.solution: Optional[TSPState] = None # Solução do problema
+        self.steps: list[TSPState] = [] # Passos da solução
 
-    def clean(self):
+    def start_timer(self):
         ''' Limpa os atributos do solver '''
         
         self.timer = time()
-        
-        self.steps = 0
-        self.solution = None
+        self.steps.clear()
     
     def finish_timer(self):
         ''' Atualiza o tempo de execução '''
@@ -31,37 +32,36 @@ class Solver:
         raise NotImplementedError()
 
 class HillClimbing(Solver):
-    def __init__(self, tsp: TSP):
-        super().__init__()
-        
-        self.tsp = tsp # Instância do problema
+    ''' Algoritmo de subida de encosta '''    
     
     def run(self):
         ''' Executa o algoritmo de subida de encosta '''
         
-        self.clean()
+        self.start_timer()
         
         current = self.tsp.random_state()
         
         while True:
+            self.steps.append(current)
+            
+            if self.verbose:
+                print(f'* STEPS: {self.steps} | COST: {current.cost}')
+            
             neighbor = min(current.successors(), key=lambda item: item.cost)
             
             if neighbor.cost >= current.cost:
                 break
             
             current = neighbor
-            
-            self.steps += 1
         
         self.finish_timer()
         
-        self.solution = current
-        
 class GeneticAlgorithm(Solver):
-    def __init__(self, tsp: TSP, population_size=100, sample_size=10, mutation_rate=0.2, generations=1000):
-        super().__init__()
+    ''' Algoritmo genético '''
+    
+    def __init__(self, tsp: TSP, verbose=False, population_size=100, sample_size=10, mutation_rate=0.2, generations=1000):
+        super().__init__(tsp, verbose)
         
-        self.tsp = tsp # Instância do problema
         self.population_size = population_size # Tamanho da população
         self.sample_size = sample_size # Tamanho das amostras
         self.mutation_rate = mutation_rate # Taxa de mutação
@@ -102,11 +102,17 @@ class GeneticAlgorithm(Solver):
     def run(self):
         ''' Executa o algoritmo genético '''
         
-        self.clean()
+        self.start_timer()
         
         population = [self.tsp.random_state() for _ in range(self.population_size)]
-
+        best = min(population, key=lambda item: item.cost)
+        
         for _ in range(self.generations):
+            self.steps.append(best)
+            
+            if self.verbose:
+                print(f'* STEPS: {self.steps} | COST: {best.cost}')
+            
             new_population: list[TSPState] = []
             
             for _ in range(self.population_size):
@@ -121,32 +127,36 @@ class GeneticAlgorithm(Solver):
                 new_population.append(child)
             
             population = new_population
+            best = min(population, key=lambda item: item.cost)
             
-            self.steps += 1
-            
+        self.steps.append(best)
         self.finish_timer()
-        
-        self.solution = min(population, key=lambda item: item.cost)
 
 class SimulatedAnnealing(Solver):
-    def __init__(self, tsp: TSP, initial_temperature=1000, final_temperature=1e-3, cooling_rate=0.999):
-        super().__init__()
-        
-        self.tsp = tsp # Instância do problema
+    ''' Algoritmo de recozimento simulado '''
+    
+    def __init__(self, tsp: TSP, verbose=False, initial_temperature=20, final_temperature=0.1, cooling_rate=0.999):
+        super().__init__(tsp, verbose)
+
         self.initial_temperature = initial_temperature # Temperatura inicial
         self.final_temperature = final_temperature # Temperatura final
         self.cooling_rate = cooling_rate # Taxa de resfriamento
-        
+           
     def run(self):
         ''' Executa o algoritmo de recozimento simulado '''
         
-        self.clean()
+        self.start_timer()
         
         current = self.tsp.random_state()
         
         T = self.initial_temperature
         
         while True:
+            self.steps.append(current)
+            
+            if self.verbose:
+                print(f'* STEPS: {self.steps} | COST: {current.cost}')
+            
             if T < self.final_temperature:
                 break
             
@@ -160,25 +170,23 @@ class SimulatedAnnealing(Solver):
                 current = next
                 
             T *= self.cooling_rate
-            
-            self.steps += 1
         
+        self.steps.append(current)
         self.finish_timer()
         
-        self.solution = current
-        
 class TabuSearch(Solver):
-    def __init__(self, tsp: TSP, tabu_list_size=100, max_iteration=1000):
-        super().__init__()
+    ''' Algoritmo de busca tabu '''
+    
+    def __init__(self, tsp: TSP, verbose=False, tabu_list_size=100, max_iteration=1000):
+        super().__init__(tsp, verbose)
         
-        self.tsp = tsp # Instância do problema
         self.tabu_list_size = tabu_list_size # Tamanho máximo da lista tabu
         self.max_iteration = max_iteration # Número máximo de iterações
         
     def run(self):
         ''' Executa o algoritmo de busca tabu '''
         
-        self.clean()
+        self.start_timer()
         
         current = self.tsp.random_state()
         best = current
@@ -187,6 +195,11 @@ class TabuSearch(Solver):
         tabu_list.append(current)
          
         for _ in range(self.max_iteration):
+            self.steps.append(best)
+            
+            if self.verbose:
+                print(f'* STEPS: {self.steps} | COST: {best.cost}')
+            
             neighbors = current.successors()
             
             current_cost = float('inf')
@@ -207,9 +220,6 @@ class TabuSearch(Solver):
             if len(tabu_list) > self.tabu_list_size:
                 tabu_list.pop(0)
                 
-            self.steps += 1
-        
+        self.steps.append(best)
         self.finish_timer()
-        
-        self.solution = best
     
